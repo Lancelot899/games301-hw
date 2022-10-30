@@ -2,6 +2,8 @@
 // Distributed under a MIT-style license, see LICENSE.txt for details.
 
 #include "TutteEmbedding.h"
+#include "symmetric_dirichlet.h"
+#include <memory>
 
 #include <pmp/visualization/MeshViewer.h>
 #include <pmp/algorithms/SurfaceParameterization.h>
@@ -32,13 +34,17 @@ protected:
 void games301::MeshViewer::process_imgui()
 {
     pmp::MeshViewer::process_imgui();
-
+    std::shared_ptr<games301::ProjectNewton> project_newton
+        = std::make_shared<SymmetricDirichlet>(1000, 1e-5);
     ImGui::Spacing();
     ImGui::Spacing();
 
     if (ImGui::CollapsingHeader("Tutte Embedding",
                                 ImGuiTreeNodeFlags_DefaultOpen))
     {
+        bool is_recompute = false;
+        bool is_project_nt = false;
+
         ImGui::Spacing();
         if (ImGui::Button("Uniform")) {
             try{
@@ -49,9 +55,7 @@ void games301::MeshViewer::process_imgui()
                 std::cerr << e.what() << std::endl;
                 return;
             }
-            mesh_.use_checkerboard_texture();
-            set_draw_mode("Texture");
-            update_mesh();
+            is_recompute = true;
         }
         if (ImGui::Button("Floater's shape-preserving")) {
             try{
@@ -62,9 +66,7 @@ void games301::MeshViewer::process_imgui()
                 std::cerr << e.what() << std::endl;
                 return;
             }
-            mesh_.use_checkerboard_texture();
-            set_draw_mode("Texture");
-            update_mesh();
+            is_recompute = true;
         }
 
         if (ImGui::Button("Mean Value Coordinates")) {
@@ -76,9 +78,7 @@ void games301::MeshViewer::process_imgui()
                 std::cerr << e.what() << std::endl;
                 return;
             }
-            mesh_.use_checkerboard_texture();
-            set_draw_mode("Texture");
-            update_mesh();
+            is_recompute = true;
         }
 
         if (ImGui::Button("Harmonic Param")){
@@ -89,6 +89,10 @@ void games301::MeshViewer::process_imgui()
                 std::cerr << e.what() << std::endl;
                 return;
             }
+            is_recompute = true;
+        }
+        if(is_recompute) {
+            project_newton->Run(mesh_);
             mesh_.use_checkerboard_texture();
             set_draw_mode("Texture");
             update_mesh();

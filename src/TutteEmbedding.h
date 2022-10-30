@@ -36,8 +36,8 @@ private:
 
     float corner_halftan(pmp::Halfedge hedge);
 
-
     pmp::SurfaceMesh& mesh_;
+
 };
 
 

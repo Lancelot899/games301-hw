@@ -197,7 +197,7 @@ void games301::SurfaceTutteEmbedding::embedding() {
             vv = mesh_.to_vertex(h);
             e = mesh_.edge(h);
             w = eweight[e];
-            ww += w;
+             ww += w;
 
             if (mesh_.is_boundary(vv))
             {
