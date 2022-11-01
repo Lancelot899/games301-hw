@@ -20,13 +20,14 @@ SymmetricDirichlet::~SymmetricDirichlet() {}
 Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
     const pmp::SurfaceMesh &mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex)
 {
-    auto dvertexs = mesh.get_face_property<Eigen::Matrix<double, 2, 3>>("f:dvertex");
+    auto dvertexs = mesh.get_face_property<Eigen::Matrix2d>("f:dvertex");
     auto areas = mesh.get_face_property<double>("f:area");
     auto f_affines = mesh.get_face_property<Eigen::Matrix<double, 2, 3>>("f:affine_matrix_I2_I3");
     Eigen::VectorXd ret = Eigen::VectorXd::Zero(mesh.vertices_size() * 2);
+    double cost = 0.0f;
     for(auto fiter = mesh.faces().begin(); fiter != mesh.faces().end(); ++fiter) {
         const pmp::Face &f = *fiter;
-        Eigen::Matrix<double, 2, 3> dv = dvertexs[f];
+        Eigen::Matrix2d dv = dvertexs[f];
         Eigen::Vector2d uv[3];
         pmp::Vertex vs[3];
         pmp::IndexType vids[3];
@@ -38,6 +39,7 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
             fviter++;
         }
         Eigen::Matrix2d F = ComputeDeltaUV(dv, uv);
+        cost += (F.squaredNorm() + 1.0 / F.squaredNorm());
 //        std::cout << "cost = " << (F.squaredNorm() + 1.0 / F.squaredNorm())  << std::endl;
         Eigen::Map<Eigen::Vector4d> Fvec(F.data());
         Eigen::Matrix2d G = T_core_ * F * T_core_.transpose();
@@ -51,33 +53,37 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
         f_affines[f] = affine;
         double I32 = I3 * I3;
         double I33 = I32 * I3;
-//        Eigen::JacobiSVD<Eigen::Matrix2d, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(F);
-//        Eigen::Vector2d sv = svd.singularValues();
-//        double I2 = sv.transpose() * sv;
-//        double I3 = sv[0] * sv[1];
 
-        Eigen::Vector4d dphidf =  (1.0 + 0.5 / I32) * Fvec - I2 / I33 * Gvec; // dphi / df
+        Eigen::Vector4d dphidf =  (1.0 + 1.0 / I32) * Fvec - I2 / I33 * Gvec; // dphi / df
         Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
-        dfdx(0, 0) = dv(0, 0); dfdx(0, 2) = dv(0, 1); dfdx(0, 4) = dv(0, 2);
-        dfdx(1, 0) = dv(1, 0); dfdx(1, 2) = dv(1, 1); dfdx(1, 4) = dv(1, 2);
-        dfdx(2, 1) = dv(0, 0); dfdx(2, 3) = dv(0, 1); dfdx(2, 5) = dv(0, 2);
-        dfdx(3, 1) = dv(1, 0); dfdx(3, 3) = dv(1, 1); dfdx(3, 5) = dv(1, 2);
+//        dfdx(0, 0) = dv(0, 0); dfdx(0, 2) = dv(0, 1); dfdx(0, 4) = dv(0, 2);
+//        dfdx(1, 0) = dv(1, 0); dfdx(1, 2) = dv(1, 1); dfdx(1, 4) = dv(1, 2);
+//        dfdx(2, 1) = dv(0, 0); dfdx(2, 3) = dv(0, 1); dfdx(2, 5) = dv(0, 2);
+//        dfdx(3, 1) = dv(1, 0); dfdx(3, 3) = dv(1, 1); dfdx(3, 5) = dv(1, 2);
+        dfdx(0, 0) = -dv(0, 0) - dv(1, 0); dfdx(0, 2) = dv(0, 0); dfdx(0, 4) = dv(1, 0);
+        dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(0, 5) = dv(1, 0);
+        dfdx(2, 0) = -dv(0, 1) - dv(1, 1); dfdx(2, 2) = dv(0, 1); dfdx(2, 4) = dv(1, 1);
+        dfdx(3, 1) = -dv(0, 1) - dv(1, 1); dfdx(3, 3) = dv(0, 1); dfdx(3, 5) = dv(1, 1);
 
         Eigen::Matrix<double, 6, 1> dphidx = dfdx.transpose() * dphidf;
 //        ret.block<2, 1>(vids[0] * 2, 0) += areas[vs[0]] * dphidx.block<2, 1>(0, 0);
 //        ret.block<2, 1>(vids[1] * 2, 0) += areas[vs[1]] * dphidx.block<2, 1>(2, 0);
 //        ret.block<2, 1>(vids[2] * 2, 0) += areas[vs[2]] * dphidx.block<2, 1>(4, 0);
-        ret.block<2, 1>(vids[0] * 2, 0) += areas[f] * dphidx.block<2, 1>(0, 0);
-        ret.block<2, 1>(vids[1] * 2, 0) += areas[f] * dphidx.block<2, 1>(2, 0);
-        ret.block<2, 1>(vids[2] * 2, 0) += areas[f] * dphidx.block<2, 1>(4, 0);
+//        ret.block<2, 1>(vids[0] * 2, 0) += areas[f] * dphidx.block<2, 1>(0, 0);
+//        ret.block<2, 1>(vids[1] * 2, 0) += areas[f] * dphidx.block<2, 1>(2, 0);
+//        ret.block<2, 1>(vids[2] * 2, 0) += areas[f] * dphidx.block<2, 1>(4, 0);
+        ret.block<2, 1>(vids[0] * 2, 0) += dphidx.block<2, 1>(0, 0);
+        ret.block<2, 1>(vids[1] * 2, 0) += dphidx.block<2, 1>(2, 0);
+        ret.block<2, 1>(vids[2] * 2, 0) += dphidx.block<2, 1>(4, 0);
     }
+    std::cout << "cost = " << cost << std::endl;
     return ret;
 }
 
 Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
     const pmp::SurfaceMesh &mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex)
 {
-    auto dvertexs = mesh.get_face_property<Eigen::Matrix<double, 2, 3>>("f:dvertex");
+    auto dvertexs = mesh.get_face_property<Eigen::Matrix2d>("f:dvertex");
     auto point_areas = mesh.get_vertex_property<double>("v:area");
     auto f_affines = mesh.get_face_property<Eigen::Matrix<double, 2, 3>>("f:affine_matrix_I2_I3");
     Eigen::VectorXd ret = Eigen::VectorXd::Zero(mesh.vertices_size() * 2);
@@ -85,7 +91,7 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
     h_vec.reserve(mesh.faces_size() * 6 * 4 * 4);
     for(auto fiter = mesh.faces().begin(); fiter != mesh.faces().end(); ++fiter) {
         const pmp::Face &f = *fiter;
-        Eigen::Matrix<double, 2, 3> dv = dvertexs[f];
+        Eigen::Matrix<double, 2, 2> dv = dvertexs[f];
         Eigen::Vector2d uv[3];
         pmp::Vertex vs[3];
         pmp::IndexType vids[3];
@@ -97,10 +103,14 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
             fviter++;
         }
         Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
-        dfdx(0, 0) = dv(0, 0); dfdx(0, 2) = dv(0, 1); dfdx(0, 4) = dv(0, 2);
-        dfdx(1, 0) = dv(1, 0); dfdx(1, 2) = dv(1, 1); dfdx(1, 4) = dv(1, 2);
-        dfdx(2, 1) = dv(0, 0); dfdx(2, 3) = dv(0, 1); dfdx(2, 5) = dv(0, 2);
-        dfdx(3, 1) = dv(1, 0); dfdx(3, 3) = dv(1, 1); dfdx(3, 5) = dv(1, 2);
+        //        dfdx(0, 0) = dv(0, 0); dfdx(0, 2) = dv(0, 1); dfdx(0, 4) = dv(0, 2);
+        //        dfdx(1, 0) = dv(1, 0); dfdx(1, 2) = dv(1, 1); dfdx(1, 4) = dv(1, 2);
+        //        dfdx(2, 1) = dv(0, 0); dfdx(2, 3) = dv(0, 1); dfdx(2, 5) = dv(0, 2);
+        //        dfdx(3, 1) = dv(1, 0); dfdx(3, 3) = dv(1, 1); dfdx(3, 5) = dv(1, 2);
+        dfdx(0, 0) = -dv(0, 0) - dv(1, 0); dfdx(0, 2) = dv(0, 0); dfdx(0, 4) = dv(1, 0);
+        dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(0, 5) = dv(1, 0);
+        dfdx(2, 0) = -dv(0, 1) - dv(1, 1); dfdx(2, 2) = dv(0, 1); dfdx(2, 4) = dv(1, 1);
+        dfdx(3, 1) = -dv(0, 1) - dv(1, 1); dfdx(3, 3) = dv(0, 1); dfdx(3, 5) = dv(1, 1);
         Eigen::Matrix<double, 2, 3> affine = f_affines[f];
         Eigen::Matrix2d F = affine.block<2, 2>(0, 0);
         double I2 = affine(0, 2);

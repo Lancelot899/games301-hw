@@ -19,25 +19,27 @@ ProjectNewton::ProjectNewton(uint16_t max_iter, double min_error) {
     L_core_ /= std::sqrt(2);
 }
 
-Eigen::Matrix<double, 2, 3> ProjectNewton::ComputeDVertex(const Eigen::Vector2d v_local[3], double area) {
-    Eigen::Matrix<double, 2, 3> dvertex;
-    dvertex.block<2, 1>(0, 0) = v_local[2] - v_local[1];
-    dvertex.block<2, 1>(1, 1) = v_local[0] - v_local[2];
-    dvertex.block<2, 1>(2, 2) = v_local[1] - v_local[0];
-    dvertex.block<1, 3>(0, 0) = -dvertex.block<1, 3>(0, 0);
-    return dvertex / area;
+Eigen::Matrix2d ProjectNewton::ComputeDVertex(const Eigen::Vector2d v_local[3], double area) {
+    Eigen::Matrix2d dvertex;
+    dvertex.block<2, 1>(0, 0) = v_local[1] - v_local[0];
+    dvertex.block<2, 1>(0, 1) = v_local[2] - v_local[0];
+    return dvertex.inverse();
+//    dvertex.block<2, 1>(0, 0) = v_local[2] - v_local[1];
+//    dvertex.block<2, 1>(1, 1) = v_local[0] - v_local[2];
+//    dvertex.block<2, 1>(2, 2) = v_local[1] - v_local[0];
+//    dvertex.block<1, 3>(0, 0) = -dvertex.block<1, 3>(0, 0);
+//    return dvertex / area;
 }
 
-Eigen::Matrix2d ProjectNewton::ComputeDeltaUV(const Eigen::Matrix<double, 2, 3> &dvertex, const Eigen::Vector2d uv[3]) {
-    Eigen::Matrix<double, 3, 2> uv_stack;
-    uv_stack.block<1, 2>(0, 0) = uv[0].transpose();
-    uv_stack.block<1, 2>(1, 0) = uv[1].transpose();
-    uv_stack.block<1, 2>(2, 0) = uv[2].transpose();
-    return dvertex * uv_stack;
+Eigen::Matrix2d ProjectNewton::ComputeDeltaUV(const Eigen::Matrix2d &dvertex, const Eigen::Vector2d uv[3]) {
+    Eigen::Matrix2d uv_stack;
+    uv_stack.block<2, 1>(0, 0) = uv[1] - uv[0];
+    uv_stack.block<2, 1>(0, 1) = uv[2] - uv[0];
+    return uv_stack * dvertex;
 }
 
 Eigen::Matrix2d ProjectNewton::ComputeDeltaUV(const Eigen::Vector2d v_local[3], double area, const Eigen::Vector2d uv[3]) {
-    Eigen::Matrix<double, 2, 3> dvertex = ComputeDVertex(v_local, area);
+    Eigen::Matrix2d dvertex = ComputeDVertex(v_local, area);
     return ComputeDeltaUV(dvertex, uv);
 }
 
@@ -203,7 +205,7 @@ void ProjectNewton::CleanPointsArea(pmp::SurfaceMesh& mesh) {
 }
 
 void ProjectNewton::ComputeDVertexPerFace(pmp::SurfaceMesh& mesh) {
-    auto dvertexs = mesh.add_face_property<Eigen::Matrix<double, 2, 3>>("f:dvertex");
+    auto dvertexs = mesh.add_face_property<Eigen::Matrix2d>("f:dvertex");
     auto local_coords = mesh.get_face_property<std::vector<Eigen::Vector2d>>("f:local_coord");
     auto face_areas = mesh.get_face_property<double>("f:area");
     for(auto fiter = mesh.faces().begin(); fiter != mesh.faces_end(); ++fiter) {
@@ -307,10 +309,18 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 
         double alpha = LineSearch(mesh, tex, direction);
 //        tex += alpha * direction;
-        for(size_t i = 0; i < tex.vector().size(); ++i) {
-            auto &t = tex.vector()[i];
-            t += alpha * direction.block<2, 1>(i * 2, 0);
+
+        const auto &vs = mesh.vertices();
+        for(auto iter = vs.begin(); iter != vs.end(); ++iter) {
+            Eigen::Vector2d &t = tex[*iter];
+            t += alpha * direction.block<2, 1>((*iter).idx() * 2, 0);
         }
+
+//        for(size_t i = 0; i < tex.vector().size(); ++i) {
+//            auto &t = tex.vector()[i];
+////            t += alpha * direction.block<2, 1>(i * 2, 0);
+//            t -= 0.01 * b.block<2, 1>(i * 2, 0);
+//        }
     }
 
     for(size_t i = 0; i < v_tex.vector().size(); ++i) {
