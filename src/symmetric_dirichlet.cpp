@@ -45,7 +45,8 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
             uv[i] = tex.block<2, 1>(vids[i] * 2, 0);
             fviter++;
         }
-#define CHECK_GRAD
+
+
 #ifdef CHECK_GRAD
         Eigen::Vector<double, 6>  uv3;
         uv3 << uv[0] , uv[1] , uv[2];
@@ -103,9 +104,9 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
 //        std::cout << dfdx << std::endl;
         Eigen::Matrix<double, 6, 1> dphidx = areas[f] * dfdx.transpose() * dphidf;
 #ifdef CHECK_GRAD
-        std::cout << "grad:\n";
-        std::cout << costad.grad.transpose() << std::endl;
-        std::cout << dphidx.transpose() << std::endl;
+        // std::cout << "grad:\n";
+        // std::cout << costad.grad.transpose() << std::endl;
+        // std::cout << dphidx.transpose() << std::endl;
 //        dphidx = costad.grad;
 #endif //#ifdef CHECK_GRAD
 //        ret.block<2, 1>(vids[0] * 2, 0) += areas[vs[0]] * dphidx.block<2, 1>(0, 0);
@@ -125,8 +126,7 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
 }
 
 Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
-    const pmp::SurfaceMesh &mesh, const Eigen::VectorXd &tex)
-{
+    const pmp::SurfaceMesh &mesh, const Eigen::VectorXd &tex) {
     auto dvertexs = mesh.get_face_property<Eigen::Matrix2d>("f:dvertex");
     auto areas = mesh.get_face_property<double>("f:area");
     auto f_affines = mesh.get_face_property<Eigen::Matrix<double, 2, 3>>("f:affine_matrix_I2_I3");
@@ -158,16 +158,17 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
         double I2 = affine(0, 2);
         double I3 = affine(1, 2);
 
-        Eigen::Matrix2d U, V;
-        Eigen::Vector2d sigma;
-        TinyAD::svd(F, U, sigma, V);
-//        Eigen::JacobiSVD<Eigen::Matrix2d> svd(F, Eigen::ComputeThinU | Eigen::ComputeThinV);
-//        Eigen::Vector2d sv = svd.singularValues();
-//        const Eigen::Matrix2d& U = svd.matrixU();
-//        const Eigen::Matrix2d& V = svd.matrixV();
+        // Eigen::Matrix2d U, V;
+        // Eigen::Vector2d sigma;
+        // TinyAD::svd(F, U, sigma, V);
+       Eigen::JacobiSVD<Eigen::Matrix2d> svd(F, Eigen::ComputeThinU | Eigen::ComputeThinV);
+       Eigen::Vector2d sigma = svd.singularValues();
+       const Eigen::Matrix2d& U = svd.matrixU();
+       const Eigen::Matrix2d& V = svd.matrixV();
 
         Eigen::Matrix2d twist;
         twist << 0, -1, 1, 0;
+
         Eigen::Matrix2d flip;
         flip << 0, 1, 1, 0;
 
@@ -176,33 +177,40 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
         Eigen::Matrix2d L = U * L_core_ * V.transpose() / std::sqrt(2.0);
         Eigen::Matrix2d T = U * T_core_ * V.transpose() / std::sqrt(2.0);
 
-        double lam1 = 1 + 3 / (sigma[0] * sigma[0] * sigma[0] * sigma[0]);
-        double lam2 = 1 + 3 / (sigma[1] * sigma[1] * sigma[1] * sigma[1]);
-        double lam3 = 1 + 1 / (I3 * I3) - I2 / (I3 * I3 * I3);
-        double lam4 = 1 + 1 / (I3 * I3) + I2 / (I3 * I3 * I3);
+        double lam1 = 1.0 + 3.0 / (sigma[0] * sigma[0] * sigma[0] * sigma[0]);
+        double lam2 = 1.0 + 3.0 / (sigma[1] * sigma[1] * sigma[1] * sigma[1]);
+        double lam3 = 1.0 + 1.0 / (I3 * I3) - I2 / (I3 * I3 * I3);
+        double lam4 = 1.0 + 1.0 / (I3 * I3) + I2 / (I3 * I3 * I3);
 
 //        lam3 = std::max(lam3, 0.0);
 //        lam4 = std::max(lam4, 0.0);
 
         Eigen::Map<Eigen::Vector4d> d1(D1.data());
         Eigen::Map<Eigen::Vector4d> d2(D2.data());
-        Eigen::Map<Eigen::Vector4d> t(T.data());
         Eigen::Map<Eigen::Vector4d> l(L.data());
+        Eigen::Map<Eigen::Vector4d> t(T.data());
 
-        Eigen::Matrix4d hessian = lam1 * d1 * d1.transpose() + lam2 * d2 * d2.transpose() + lam3 * l * l.transpose() + lam4 * t * t.transpose();
+        Eigen::Matrix4d hessian = lam1 * d1 * d1.transpose() + lam2 * d2 * d2.transpose()
+                                    + lam3 * l * l.transpose() + lam4 * t * t.transpose();
         Eigen::Matrix<double, 6, 6> dphidxdx = areas[f] * dfdx.transpose() * hessian * dfdx;
 
-
+#define CHECK_GRAD
 #ifdef CHECK_GRAD
-        typedef std::conditional<number_check_, TinyAD::Double<4>, double>::type T40;
-        Eigen::Vector4<T40> Fvvad = T40::make_active({F(0, 0), F(1, 0), F(0, 1), F(1, 1)});
-        Eigen::Matrix2<T40> FFad;
-        FFad << Fvvad[0],  Fvvad[1], Fvvad[2], Fvvad[3];
-        auto cost_F = 0.5 * (FFad.squaredNorm() + FFad.inverse().squaredNorm());
-        std::cout << "\nhessian :\n";
-        std::cout << cost_F.Hess << std::endl;
-        std::cout << "\n";
-        std::cout << hessian << std::endl;
+        // typedef std::conditional<number_check_, TinyAD::Double<4>, double>::type T40;
+        // Eigen::Vector<TinyAD::Double<4>, 4> Fvvad = T40::make_active({F(0, 0), F(1, 0), F(0, 1), F(1, 1)});
+        // Eigen::Matrix2<T40> FFad;
+        // FFad(0, 0) = Fvvad(0);
+        // FFad(1, 0) = Fvvad(1);
+        // FFad(0, 1) = Fvvad(2);
+        // FFad(1, 1) = Fvvad(3);
+
+        // auto cost_F = 0.5 * (FFad.squaredNorm() + FFad.inverse().squaredNorm());
+
+        // std::cout << cost_F.grad.transpose() << std::endl;
+        // std::cout << "\nhessian :\n";
+        // std::cout << cost_F.Hess << std::endl;
+        // std::cout << "\n";
+        // std::cout << hessian << std::endl;
 
         Eigen::Vector<double, 6>  uv3;
         uv3 << uv[0] , uv[1] , uv[2];
@@ -218,11 +226,12 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
 
         T6 costad = 0.5 * areas[f] * (Fad.squaredNorm() + Fad.inverse().squaredNorm());
         TinyAD::project_positive_definite(costad.Hess, TinyAD::default_hessian_projection_eps);
+       // dphidxdx = costad.Hess;
+    //    std::cout << "\nhessian :\n";
+    //    std::cout << costad.Hess << std::endl;
+    //    std::cout << "\n";
+    //    std::cout << dphidxdx << std::endl;
         dphidxdx = costad.Hess;
-//        std::cout << "\nhessian :\n";
-//        std::cout << costad.Hess << std::endl;
-//        std::cout << "\n";
-//        std::cout << dphidxdx << std::endl;
 #endif //#ifdef CHECK_GRAD
 
 //        std::cout << "hessian = " << dphidxdx << std::endl;

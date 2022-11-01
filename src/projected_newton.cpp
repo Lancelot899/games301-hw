@@ -317,7 +317,7 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
         }
         ldlt.factorize(H);
         Eigen::VectorXd direction = ldlt.solve(-b);
-//        std::cout << "direct = " << direction.norm() / direction.size() << std::endl;
+       std::cout << "direct = " << direction.norm() / direction.size() << std::endl;
         double alpha = LineSearch(mesh, tex, direction);
         tex += alpha * direction;
 
