@@ -17,11 +17,12 @@ public:
 protected:
     void PreRun(pmp::SurfaceMesh& mesh);
     void PostRun(pmp::SurfaceMesh& mesh);
-    Eigen::VectorXd ComputeEnergyGrad(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex);
-    Eigen::SparseMatrix<double> ProjectHessian(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex);
-    double LineSearch(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex, const Eigen::VectorXd &d);
+    Eigen::VectorXd ComputeEnergyGrad(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex);
+    Eigen::SparseMatrix<double> ProjectHessian(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex);
+    double LineSearch(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex, const Eigen::VectorXd &d);
 private:
-
+    double last_cost = 1e9;
+    double last_alpha_ = 1.0;
 };
 
 

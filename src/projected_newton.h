@@ -37,9 +37,9 @@ protected:
     virtual Eigen::Matrix2d ComputeDeltaUV(const Eigen::Matrix2d &dvertex, const Eigen::Vector2d uv[3]);
     virtual Eigen::Matrix2d ComputeDeltaUV(const Eigen::Vector2d local_vertex[3], double area, const Eigen::Vector2d uv[3]);
     virtual Eigen::Matrix2d ComputeDeltaUV(const Eigen::Vector3d vertex[3], const Eigen::Vector2d uv[3]);
-    virtual Eigen::VectorXd ComputeEnergyGrad(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex) = 0;
-    virtual Eigen::SparseMatrix<double> ProjectHessian(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex) = 0;
-    virtual double LineSearch(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex, const Eigen::VectorXd &d) = 0;
+    virtual Eigen::VectorXd ComputeEnergyGrad(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex) = 0;
+    virtual Eigen::SparseMatrix<double> ProjectHessian(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex) = 0;
+    virtual double LineSearch(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex, const Eigen::VectorXd &d) = 0;
 
 
 protected:

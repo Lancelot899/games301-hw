@@ -9,10 +9,13 @@ ProjectNewton::ProjectNewton(uint16_t max_iter, double min_error) {
     T_core_ = Eigen::Matrix2d::Zero();
     T_core_(0, 1) = -1;
     T_core_(1, 0) = 1;
+
     D1_core_ = Eigen::Matrix2d::Zero();
     D1_core_(0, 0) = 1.0;
+
     D2_core_ = Eigen::Matrix2d::Zero();
     D2_core_(1, 1) = 1.0;
+
     L_core_ = Eigen::Matrix2d::Zero();
     L_core_(0, 1) = 1.0;
     L_core_(1, 0) = 1.0;
@@ -33,8 +36,7 @@ Eigen::Matrix2d ProjectNewton::ComputeDVertex(const Eigen::Vector2d v_local[3], 
 
 Eigen::Matrix2d ProjectNewton::ComputeDeltaUV(const Eigen::Matrix2d &dvertex, const Eigen::Vector2d uv[3]) {
     Eigen::Matrix2d uv_stack;
-    uv_stack.block<2, 1>(0, 0) = uv[1] - uv[0];
-    uv_stack.block<2, 1>(0, 1) = uv[2] - uv[0];
+    uv_stack << uv[1] - uv[0], uv[2] - uv[0];
     return uv_stack * dvertex;
 }
 
@@ -277,13 +279,19 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 
     PreRun(mesh);
     auto v_tex = mesh.get_vertex_property<pmp::TexCoord>("v:tex");
-    auto tex = mesh.add_vertex_property<Eigen::Vector2d>("v:tex_new");
+//    auto tex = mesh.add_vertex_property<Eigen::Vector2d>("v:tex_new");
+    Eigen::VectorXd tex = Eigen::VectorXd::Zero(mesh.vertices_size() * 2);
+    bool pattern_compute = false;
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt;
 
-    for(size_t i = 0; i < v_tex.vector().size(); ++i) {
-        auto &t = v_tex.vector()[i];
-        tex.vector()[i][0] = t[0];
-        tex.vector()[i][1] = t[1];
+    const auto &vertex_container = mesh.vertices();
+    for(auto viter = vertex_container.begin(); viter != vertex_container.end(); ++viter) {
+        pmp::Vertex v = *viter;
+        pmp::TexCoord t = v_tex[v];
+        tex[v.idx() * 2] = t[0];
+        tex[v.idx() * 2 + 1] = t[1];
     }
+
 
     for(int iter = 0; iter < max_iter_; ++iter) {
         Eigen::VectorXd b = ComputeEnergyGrad(mesh, tex);
@@ -303,18 +311,22 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 //        cg.compute(H);
 //        Eigen::VectorXd direction = cg.solve(-b);
 
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt;
-        ldlt.compute(H);
-        Eigen::VectorXd direction = ldlt.solve(-b);
 
-        double alpha = LineSearch(mesh, tex, direction);
-//        tex += alpha * direction;
-
-        const auto &vs = mesh.vertices();
-        for(auto iter = vs.begin(); iter != vs.end(); ++iter) {
-            Eigen::Vector2d &t = tex[*iter];
-            t += alpha * direction.block<2, 1>((*iter).idx() * 2, 0);
+        if(!pattern_compute) {
+            ldlt.analyzePattern(H);
+            pattern_compute = true;
         }
+        ldlt.factorize(H);
+        Eigen::VectorXd direction = ldlt.solve(-b);
+//        std::cout << "direct = " << direction.norm() / direction.size() << std::endl;
+        double alpha = LineSearch(mesh, tex, direction);
+        tex += alpha * direction;
+
+//        const auto &vs = mesh.vertices();
+//        for(auto iter = vs.begin(); iter != vs.end(); ++iter) {
+//            Eigen::Vector2d &t = tex[*iter];
+//            t += alpha * direction.block<2, 1>((*iter).idx() * 2, 0);
+//        }
 
 //        for(size_t i = 0; i < tex.vector().size(); ++i) {
 //            auto &t = tex.vector()[i];
@@ -323,12 +335,17 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 //        }
     }
 
-    for(size_t i = 0; i < v_tex.vector().size(); ++i) {
-        auto &t = v_tex.vector()[i];
-        auto &tn = tex.vector()[i];
-        t = tn;
+//    for(size_t i = 0; i < v_tex.vector().size(); ++i) {
+//        auto &t = v_tex.vector()[i];
+//        auto &tn = tex.vector()[i];
+//        t = tn;
+//    }
+    for(auto viter = vertex_container.begin(); viter != vertex_container.end(); ++viter) {
+        pmp::Vertex v = *viter;
+        pmp::TexCoord &t = v_tex[v];
+        t[0] = tex[v.idx() * 2];
+        t[1] = tex[v.idx() * 2 + 1];
     }
-    mesh.remove_vertex_property(tex);
 
     PostRun(mesh);
     CleanDVertexPerFace(mesh);

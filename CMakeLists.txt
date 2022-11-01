@@ -21,14 +21,18 @@ include_directories(${PROJECT_SOURCE_DIR}/external/pmp-library/external/imgui)
 include_directories(${PROJECT_SOURCE_DIR}/external/pmp-library/external/eigen)
 include_directories(${PROJECT_SOURCE_DIR}/external/pmp-library/external/glfw/include)
 include_directories(${PROJECT_SOURCE_DIR}/external/pmp-library/external/glew/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/TinyAD)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/)
+
+set(CMAKE_CXX_STANDARD  17)
 
 # set default compiler flags
 if((UNIX OR APPLE) AND CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pedantic -Wall -Wextra")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pedantic -Wall -Wextra")
 endif()
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND NOT EMSCRIPTEN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pedantic -Wall -Wextra -Wno-unused-parameter")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pedantic -Wall -Wextra -Wno-unused-parameter")
 endif()
 
 if(WIN32)
@@ -36,7 +40,7 @@ if(WIN32)
 endif()
 
 if (EMSCRIPTEN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -s ALLOW_MEMORY_GROWTH=1 -s USE_GLFW=3 -s WASM=0 -s USE_WEBGL2=1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -s ALLOW_MEMORY_GROWTH=1 -s USE_GLFW=3 -s WASM=0 -s USE_WEBGL2=1")
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
 endif()
 
