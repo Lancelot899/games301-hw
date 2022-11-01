@@ -35,7 +35,7 @@ void games301::MeshViewer::process_imgui()
 {
     pmp::MeshViewer::process_imgui();
     std::shared_ptr<games301::ProjectNewton> project_newton
-        = std::make_shared<SymmetricDirichlet>(1000, 1e-5);
+        = std::make_shared<SymmetricDirichlet>(100, 1e-5);
     ImGui::Spacing();
     ImGui::Spacing();
 

@@ -277,10 +277,14 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
             break;
         }
         Eigen::SparseMatrix<double> H = ProjectHessian(mesh, tex);
-        Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Upper | Eigen::Lower> cg;
-        cg.setTolerance(0.00005);
-        cg.compute(H);
-        Eigen::VectorXd direction = cg.solve(-b);
+//        Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Upper | Eigen::Lower> cg;
+//        cg.setTolerance(0.00005);
+//        cg.compute(H);
+//        Eigen::VectorXd direction = cg.solve(-b);
+
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt;
+        ldlt.compute(H);
+        Eigen::VectorXd direction = ldlt.solve(-b);
 
         double alpha = LineSearch(mesh, tex, direction);
 //        tex += alpha * direction;
