@@ -1,6 +1,7 @@
 #include "symmetric_dirichlet.h"
 #include "Scalar.hh"
 #include "TinyAD/Utils/HessianProjection.hh"
+#include <TinyAD/Operations/SVD.hh>
 
 namespace games301 {
 const bool number_check_ = true;
@@ -61,6 +62,7 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
         T costad = 0.5 * areas[f] * (Fad.squaredNorm() + Fad.inverse().squaredNorm());
 #endif //#ifdef CHECK_GRAD
         Eigen::Matrix2d F = ComputeDeltaUV(dv, uv);
+
 #ifdef CHECK_GRAD
         typedef std::conditional<number_check_, TinyAD::Double<4>, double>::type T4;
         Eigen::Vector4<T4> Fvvad = T4::make_active({F(0, 0), F(1, 0), F(0, 1), F(1, 1)});
@@ -77,6 +79,7 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
         Eigen::Map<Eigen::Vector4d> Gvec(G.data());
         double I2 = F.squaredNorm();
         double I3 = F.determinant();
+
         Eigen::Matrix<double, 2, 3> affine;
         affine.block<2, 2>(0, 0) = F;
         affine(0, 2) = I2;
@@ -88,15 +91,11 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
 
         Eigen::Vector4d dphidf =  (1.0 + 1.0 / I32) * Fvec - I2 / I33 * Gvec; // dphi / df
 #ifdef CHECK_GRAD
-//        std::cout << "df\n";
-//        std::cout << cost_F.grad.transpose() << std::endl;
-//        std::cout << dphidf.transpose() << std::endl;
+        std::cout << "df\n";
+        std::cout << cost_F.grad.transpose() << std::endl;
+        std::cout << dphidf.transpose() << std::endl;
 #endif //#ifdef CHECK_GRAD
         Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
-//        dfdx(0, 0) = dv(0, 0); dfdx(0, 2) = dv(0, 1); dfdx(0, 4) = dv(0, 2);
-//        dfdx(1, 0) = dv(1, 0); dfdx(1, 2) = dv(1, 1); dfdx(1, 4) = dv(1, 2);
-//        dfdx(2, 1) = dv(0, 0); dfdx(2, 3) = dv(0, 1); dfdx(2, 5) = dv(0, 2);
-//        dfdx(3, 1) = dv(1, 0); dfdx(3, 3) = dv(1, 1); dfdx(3, 5) = dv(1, 2);
         dfdx(0, 0) = -dv(0, 0) - dv(1, 0); dfdx(0, 2) = dv(0, 0); dfdx(0, 4) = dv(1, 0);
         dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(0, 5) = dv(1, 0);
         dfdx(2, 0) = -dv(0, 1) - dv(1, 1); dfdx(2, 2) = dv(0, 1); dfdx(2, 4) = dv(1, 1);
@@ -104,10 +103,10 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
 //        std::cout << dfdx << std::endl;
         Eigen::Matrix<double, 6, 1> dphidx = areas[f] * dfdx.transpose() * dphidf;
 #ifdef CHECK_GRAD
-//        std::cout << "grad:\n";
-//        std::cout << costad.grad.transpose() << std::endl;
-//        std::cout << dphidx.transpose() << std::endl;
-        dphidx = costad.grad;
+        std::cout << "grad:\n";
+        std::cout << costad.grad.transpose() << std::endl;
+        std::cout << dphidx.transpose() << std::endl;
+//        dphidx = costad.grad;
 #endif //#ifdef CHECK_GRAD
 //        ret.block<2, 1>(vids[0] * 2, 0) += areas[vs[0]] * dphidx.block<2, 1>(0, 0);
 //        ret.block<2, 1>(vids[1] * 2, 0) += areas[vs[1]] * dphidx.block<2, 1>(2, 0);
@@ -146,8 +145,8 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
             uv[i] = tex.block<2, 1>(vids[i] * 2, 0);
             fviter++;
         }
-        Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
 
+        Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
         dfdx(0, 0) = -dv(0, 0) - dv(1, 0); dfdx(0, 2) = dv(0, 0); dfdx(0, 4) = dv(1, 0);
         dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(0, 5) = dv(1, 0);
         dfdx(2, 0) = -dv(0, 1) - dv(1, 1); dfdx(2, 2) = dv(0, 1); dfdx(2, 4) = dv(1, 1);
@@ -155,35 +154,42 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
 
         Eigen::Matrix<double, 2, 3> affine = f_affines[f];
         Eigen::Matrix2d F = affine.block<2, 2>(0, 0);
+
         double I2 = affine(0, 2);
         double I3 = affine(1, 2);
 
-        Eigen::JacobiSVD<Eigen::Matrix2d> svd(F, Eigen::ComputeThinU | Eigen::ComputeThinV);
-        Eigen::Vector2d sv = svd.singularValues();
-        const Eigen::Matrix2d& U = svd.matrixU();
-        const Eigen::Matrix2d& V = svd.matrixV();
+        Eigen::Matrix2d U, V;
+        Eigen::Vector2d sigma;
+        TinyAD::svd(F, U, sigma, V);
+//        Eigen::JacobiSVD<Eigen::Matrix2d> svd(F, Eigen::ComputeThinU | Eigen::ComputeThinV);
+//        Eigen::Vector2d sv = svd.singularValues();
+//        const Eigen::Matrix2d& U = svd.matrixU();
+//        const Eigen::Matrix2d& V = svd.matrixV();
+
+        Eigen::Matrix2d twist;
+        twist << 0, -1, 1, 0;
+        Eigen::Matrix2d flip;
+        flip << 0, 1, 1, 0;
 
         Eigen::Matrix2d D1 = U * D1_core_ * V.transpose();
         Eigen::Matrix2d D2 = U * D2_core_ * V.transpose();
-        Eigen::Matrix2d L = U * L_core_ * V.transpose();
-        Eigen::Matrix2d T = U * T_core_ * V.transpose();
+        Eigen::Matrix2d L = U * L_core_ * V.transpose() / std::sqrt(2.0);
+        Eigen::Matrix2d T = U * T_core_ * V.transpose() / std::sqrt(2.0);
 
-        double lambda0 = 1 + 3.0 / sv[0] / sv[0] / sv[0] / sv[0];
-        double lambda1 = 1 + 3.0 / sv[1] / sv[1] / sv[1] / sv[1];
-        double lambda2 = 1 + 1.0 / I3 / I3;
-        double I2I3 = I2 / I3 / I3 / I3;
-        double lambda3 = lambda2 - I2I3;
-        lambda2 += I2I3;
-//        lambda0 = lambda0 > 0 ? lambda0 : 0;
-//        lambda1 = lambda1 > 0 ? lambda1 : 0;
-//        lambda2 = lambda2 > 0 ? lambda2 : 0;
-//        lambda3 = lambda3 > 0 ? lambda3 : 0;
+        double lam1 = 1 + 3 / (sigma[0] * sigma[0] * sigma[0] * sigma[0]);
+        double lam2 = 1 + 3 / (sigma[1] * sigma[1] * sigma[1] * sigma[1]);
+        double lam3 = 1 + 1 / (I3 * I3) - I2 / (I3 * I3 * I3);
+        double lam4 = 1 + 1 / (I3 * I3) + I2 / (I3 * I3 * I3);
+
+//        lam3 = std::max(lam3, 0.0);
+//        lam4 = std::max(lam4, 0.0);
+
         Eigen::Map<Eigen::Vector4d> d1(D1.data());
         Eigen::Map<Eigen::Vector4d> d2(D2.data());
         Eigen::Map<Eigen::Vector4d> t(T.data());
         Eigen::Map<Eigen::Vector4d> l(L.data());
 
-        Eigen::Matrix4d hessian = lambda0 * d1 * d1.transpose() + lambda1 * d2 * d2.transpose() + lambda2 * t * t.transpose() + lambda3 * l * l.transpose();
+        Eigen::Matrix4d hessian = lam1 * d1 * d1.transpose() + lam2 * d2 * d2.transpose() + lam3 * l * l.transpose() + lam4 * t * t.transpose();
         Eigen::Matrix<double, 6, 6> dphidxdx = areas[f] * dfdx.transpose() * hessian * dfdx;
 
 
@@ -193,11 +199,10 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
         Eigen::Matrix2<T40> FFad;
         FFad << Fvvad[0],  Fvvad[1], Fvvad[2], Fvvad[3];
         auto cost_F = 0.5 * (FFad.squaredNorm() + FFad.inverse().squaredNorm());
-
-//        std::cout << "\nhessian :\n";
-//        std::cout << cost_F.Hess << std::endl;
-//        std::cout << "\n";
-//        std::cout << hessian << std::endl;
+        std::cout << "\nhessian :\n";
+        std::cout << cost_F.Hess << std::endl;
+        std::cout << "\n";
+        std::cout << hessian << std::endl;
 
         Eigen::Vector<double, 6>  uv3;
         uv3 << uv[0] , uv[1] , uv[2];

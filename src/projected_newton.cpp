@@ -19,7 +19,6 @@ ProjectNewton::ProjectNewton(uint16_t max_iter, double min_error) {
     L_core_ = Eigen::Matrix2d::Zero();
     L_core_(0, 1) = 1.0;
     L_core_(1, 0) = 1.0;
-    L_core_ /= std::sqrt(2);
 }
 
 Eigen::Matrix2d ProjectNewton::ComputeDVertex(const Eigen::Vector2d v_local[3], double area) {
@@ -51,7 +50,7 @@ Eigen::Matrix2d ProjectNewton::ComputeDeltaUV(const Eigen::Vector3d vertex[3], c
     Eigen::Vector3d normal = e1.cross(e2);
     double area = normal.norm();
     normal /= area;
-
+    area *= 0.5;
     double e1n = e1.norm();
     Eigen::Vector3d x_local = e1 / e1n;
     Eigen::Vector3d y_local = normal.cross(x_local);
@@ -91,7 +90,9 @@ void ProjectNewton::ComputeLocalCoord(pmp::SurfaceMesh& mesh) {
         auto e1_id = mesh.find_edge(vs[1], vs[0]);
         double e1n = edge_length[e1_id];
         Eigen::Vector3d x_local = e1 / e1n;
+        if(std::abs(x_local.norm() - 1) > 1e-8) throw ;
         Eigen::Vector3d y_local = normal.cross(x_local);
+        if(std::abs(y_local.norm() - 1) > 1e-8) throw ;
         coord.resize(3, Eigen::Vector2d::Zero());
         coord[1] = Eigen::Vector2d(e1n, 0);
         coord[2](0) = e2.dot(x_local);
@@ -245,6 +246,7 @@ void ProjectNewton::ComputeAreaAndNormal(pmp::SurfaceMesh& mesh) {
         Eigen::Vector3d normal = e1.cross(e2);
         areas[f] = normal.norm();
         normals[f] = normal / areas[f];
+        areas[f] *= 0.5;
     }
 }
 
@@ -272,8 +274,6 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 //    auto points = mesh.vertex_property<pmp::Point>("v:point");
     ComputeAreaAndNormal(mesh);
     ComputeEdgeLength(mesh);
-    ComputeFaceCenter(mesh);
-    ComputePointsArea(mesh);
     ComputeLocalCoord(mesh);
     ComputeDVertexPerFace(mesh);
 
@@ -291,7 +291,6 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
         tex[v.idx() * 2] = t[0];
         tex[v.idx() * 2 + 1] = t[1];
     }
-
 
     for(int iter = 0; iter < max_iter_; ++iter) {
         Eigen::VectorXd b = ComputeEnergyGrad(mesh, tex);
@@ -349,11 +348,9 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 
     PostRun(mesh);
     CleanDVertexPerFace(mesh);
-    CleanFaceCenter(mesh);
     CleanEdgeLength(mesh);
     CleanAreaAndNormal(mesh);
     CleanLocalCoord(mesh);
-    CleanPointsArea(mesh);
 
     return true;
 }
