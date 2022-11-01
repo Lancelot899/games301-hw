@@ -15,6 +15,8 @@ public:
     ~SymmetricDirichlet();
 
 protected:
+    void PreRun(pmp::SurfaceMesh& mesh);
+    void PostRun(pmp::SurfaceMesh& mesh);
     Eigen::VectorXd ComputeEnergyGrad(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex);
     Eigen::SparseMatrix<double> ProjectHessian(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex);
     double LineSearch(const pmp::SurfaceMesh& mesh, const pmp::VertexProperty<Eigen::Vector2d> &tex, const Eigen::VectorXd &d);

@@ -18,6 +18,8 @@ public:
     virtual bool Run(pmp::SurfaceMesh& mesh);
 
 protected:
+    virtual void PreRun(pmp::SurfaceMesh& mesh);
+    virtual void PostRun(pmp::SurfaceMesh& mesh);
     void ComputeLocalCoord(pmp::SurfaceMesh& mesh);
     void ComputeAreaAndNormal(pmp::SurfaceMesh& mesh);
     void ComputePointsArea(pmp::SurfaceMesh& mesh);
@@ -43,6 +45,10 @@ protected:
 protected:
     int    max_iter_ = 0;
     double min_error_ = 0;
+    Eigen::Matrix2d T_core_;
+    Eigen::Matrix2d D1_core_;
+    Eigen::Matrix2d D2_core_;
+    Eigen::Matrix2d L_core_;
 };
 
 

@@ -6,6 +6,17 @@ namespace games301 {
 ProjectNewton::ProjectNewton(uint16_t max_iter, double min_error) {
     max_iter_  = max_iter;
     min_error_ = min_error;
+    T_core_ = Eigen::Matrix2d::Zero();
+    T_core_(0, 1) = -1;
+    T_core_(1, 0) = 1;
+    D1_core_ = Eigen::Matrix2d::Zero();
+    D1_core_(0, 0) = 1.0;
+    D2_core_ = Eigen::Matrix2d::Zero();
+    D2_core_(1, 1) = 1.0;
+    L_core_ = Eigen::Matrix2d::Zero();
+    L_core_(0, 1) = 1.0;
+    L_core_(1, 0) = 1.0;
+    L_core_ /= std::sqrt(2);
 }
 
 Eigen::Matrix<double, 2, 3> ProjectNewton::ComputeDVertex(const Eigen::Vector2d v_local[3], double area) {
@@ -245,6 +256,14 @@ void ProjectNewton::CleanAreaAndNormal(pmp::SurfaceMesh& mesh) {
     mesh.remove_face_property(normals);
 }
 
+void ProjectNewton::PreRun(pmp::SurfaceMesh& mesh) {
+
+}
+
+void ProjectNewton::PostRun(pmp::SurfaceMesh& mesh) {
+
+}
+
 bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 //    auto points = mesh.vertex_property<pmp::Point>("v:point");
     ComputeAreaAndNormal(mesh);
@@ -254,7 +273,7 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
     ComputeLocalCoord(mesh);
     ComputeDVertexPerFace(mesh);
 
-
+    PreRun(mesh);
     auto v_tex = mesh.get_vertex_property<pmp::TexCoord>("v:tex");
     auto tex = mesh.add_vertex_property<Eigen::Vector2d>("v:tex_new");
 
@@ -300,6 +319,8 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
         t = tn;
     }
     mesh.remove_vertex_property(tex);
+
+    PostRun(mesh);
     CleanDVertexPerFace(mesh);
     CleanFaceCenter(mesh);
     CleanEdgeLength(mesh);
