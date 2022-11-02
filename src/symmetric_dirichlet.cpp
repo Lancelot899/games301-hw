@@ -98,7 +98,7 @@ Eigen::VectorXd SymmetricDirichlet::ComputeEnergyGrad(
 #endif //#ifdef CHECK_GRAD
         Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
         dfdx(0, 0) = -dv(0, 0) - dv(1, 0); dfdx(0, 2) = dv(0, 0); dfdx(0, 4) = dv(1, 0);
-        dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(0, 5) = dv(1, 0);
+        dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(1, 5) = dv(1, 0);
         dfdx(2, 0) = -dv(0, 1) - dv(1, 1); dfdx(2, 2) = dv(0, 1); dfdx(2, 4) = dv(1, 1);
         dfdx(3, 1) = -dv(0, 1) - dv(1, 1); dfdx(3, 3) = dv(0, 1); dfdx(3, 5) = dv(1, 1);
 //        std::cout << dfdx << std::endl;
@@ -148,7 +148,7 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
 
         Eigen::Matrix<double, 4, 6> dfdx = Eigen::Matrix<double, 4, 6>::Zero();
         dfdx(0, 0) = -dv(0, 0) - dv(1, 0); dfdx(0, 2) = dv(0, 0); dfdx(0, 4) = dv(1, 0);
-        dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(0, 5) = dv(1, 0);
+        dfdx(1, 1) = -dv(0, 0) - dv(1, 0); dfdx(1, 3) = dv(0, 0); dfdx(1, 5) = dv(1, 0);
         dfdx(2, 0) = -dv(0, 1) - dv(1, 1); dfdx(2, 2) = dv(0, 1); dfdx(2, 4) = dv(1, 1);
         dfdx(3, 1) = -dv(0, 1) - dv(1, 1); dfdx(3, 3) = dv(0, 1); dfdx(3, 5) = dv(1, 1);
 
