@@ -295,35 +295,43 @@ Eigen::SparseMatrix<double> SymmetricDirichlet::ProjectHessian(
 
 double SymmetricDirichlet::LineSearch(const pmp::SurfaceMesh &mesh,
                                       const Eigen::VectorXd &tex,
-                                      const Eigen::VectorXd &d) {
+                                      const Eigen::VectorXd &d, const Eigen::VectorXd &grad) {
     auto dvertexs = mesh.get_face_property<Eigen::Matrix2d>("f:dvertex");
     auto areas = mesh.get_face_property<double>("f:area");
     auto f_affines = mesh.get_face_property<Eigen::Matrix<double, 2, 3>>("f:affine_matrix_I2_I3");
     double current_cost = 0.0f;
-    for(auto fiter = mesh.faces().begin(); fiter != mesh.faces().end(); ++fiter)
-    {
-        const pmp::Face &f = *fiter;
-        Eigen::Matrix2d dv = dvertexs[f];
-        Eigen::Vector2d uv[3];
-        pmp::Vertex vs[3];
-        auto fviter = mesh.vertices(f);
-        for (int i = 0; i < 3; ++i)
+    Eigen::VectorXd newX;
+    double s = 1.0;
+    constexpr double shrink = 0.8;
+    constexpr double armijoConst = 1e-4;
+    for (int j = 0; j < 64; j++) {
+        newX = tex + s * d;
+        for(auto fiter = mesh.faces().begin(); fiter != mesh.faces().end(); ++fiter)
         {
-            vs[i] = *fviter;
-            uv[i] = tex.block<2, 1>(vs[i].idx() * 2, 0) + last_alpha_ * d.block<2, 1>(vs[i].idx() * 2, 0);
-            fviter++;
+            const pmp::Face &f = *fiter;
+            Eigen::Matrix2d dv = dvertexs[f];
+            Eigen::Vector2d uv[3];
+            pmp::Vertex vs[3];
+            auto fviter = mesh.vertices(f);
+            for (int i = 0; i < 3; ++i)
+            {
+                vs[i] = *fviter;
+                uv[i] = tex.block<2, 1>(vs[i].idx() * 2, 0) + last_alpha_ * d.block<2, 1>(vs[i].idx() * 2, 0);
+                fviter++;
+            }
+            Eigen::Matrix2d F = ComputeDeltaUV(dv, uv);
+            current_cost += (F.squaredNorm() +  F.inverse().squaredNorm());
         }
-        Eigen::Matrix2d F = ComputeDeltaUV(dv, uv);
-        current_cost += (F.squaredNorm() +  F.inverse().squaredNorm());
+        if (current_cost <= last_cost + armijoConst * s * d.dot(grad)) {
+            std::cout << "old cost = " << last_cost << ", new cost = " << current_cost << std::endl;
+            last_cost = current_cost;
+            break;
+        }
+
+        s *= shrink;
     }
 
-    if(current_cost > last_cost) {
-        last_alpha_ = (last_cost / current_cost) * last_alpha_ * 0.1;
-    } else {
-        last_alpha_ = 1.0;
-    }
-
-    return last_alpha_;
+    return s;
 }
 
 }

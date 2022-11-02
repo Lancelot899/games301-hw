@@ -1,5 +1,5 @@
 #include "projected_newton.h"
-
+#include <fstream>
 
 namespace games301 {
 
@@ -318,7 +318,7 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
         ldlt.factorize(H);
         Eigen::VectorXd direction = ldlt.solve(-b);
        std::cout << "direct = " << direction.norm() / direction.size() << std::endl;
-        double alpha = LineSearch(mesh, tex, direction);
+        double alpha = LineSearch(mesh, tex, direction, b);
         tex += alpha * direction;
 
 //        const auto &vs = mesh.vertices();
@@ -339,13 +339,28 @@ bool ProjectNewton::Run(pmp::SurfaceMesh& mesh) {
 //        auto &tn = tex.vector()[i];
 //        t = tn;
 //    }
+
+    double min = 1.0e10;
+    double max = 0.0f;
+    for(int i = 0; i < tex.size(); ++i) {
+        if(min > tex[i]) {
+            min = tex[i];
+        }
+
+        if(max < tex[i]) {
+            max = tex[i];
+        }
+    }
+
+    tex -= min * Eigen::VectorXd::Ones(tex.size());
+    tex /= (max - min);
+
     for(auto viter = vertex_container.begin(); viter != vertex_container.end(); ++viter) {
         pmp::Vertex v = *viter;
         pmp::TexCoord &t = v_tex[v];
         t[0] = tex[v.idx() * 2];
         t[1] = tex[v.idx() * 2 + 1];
     }
-
     PostRun(mesh);
     CleanDVertexPerFace(mesh);
     CleanEdgeLength(mesh);

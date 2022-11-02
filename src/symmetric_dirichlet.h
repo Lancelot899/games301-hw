@@ -19,7 +19,7 @@ protected:
     void PostRun(pmp::SurfaceMesh& mesh);
     Eigen::VectorXd ComputeEnergyGrad(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex);
     Eigen::SparseMatrix<double> ProjectHessian(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex);
-    double LineSearch(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex, const Eigen::VectorXd &d);
+    double LineSearch(const pmp::SurfaceMesh& mesh, const Eigen::VectorXd &tex, const Eigen::VectorXd &d, const Eigen::VectorXd &grad);
 private:
     double last_cost = 1e9;
     double last_alpha_ = 1.0;
